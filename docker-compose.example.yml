@@ -3,7 +3,7 @@
 # same path Syncthing uses, and the config mount is only there for the API key.
 services:
   syncpick:
-    image: syncpick:latest        # or: build: ./syncpick
+    image: ghcr.io/trsaunders/syncpick:latest   # or: build: ./syncpick
     container_name: syncpick
     environment:
       PUID: 1000                  # same user as your Syncthing container

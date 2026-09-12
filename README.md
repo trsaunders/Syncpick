@@ -55,11 +55,15 @@ Syncpick is a single container that sits next to your Syncthing container. See
 | `PORT` | Web UI port. Default `8080` |
 | `DRY_RUN` | `true` to change nothing |
 
-Build and start:
+Images are published to GitHub Container Registry for `linux/amd64` and
+`linux/arm64` on every push to `main` (`latest`) and every `v*` tag:
 
 ```bash
-docker compose build syncpick && docker compose up -d syncpick
+docker compose pull syncpick && docker compose up -d syncpick
 ```
+
+Or build it yourself with `docker compose build syncpick` if you point the
+service at `build: ./syncpick` instead of the image.
 
 Then open the UI, pick a folder, and press **Enable selective sync**. The
 initial whitelist is seeded from what is already on disk, so enabling changes
