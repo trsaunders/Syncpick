@@ -1,0 +1,524 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Syncpick</title>
+<style>
+  :root {
+    --bg: #F2F4F6; --surface: #FFFFFF; --ink: #17222C; --ink-2: #4B5865; --ink-3: #7B8791;
+    --line: #D8DFE5; --accent: #0B6E82; --accent-soft: #DCEDF1; --accent-ink: #085A6A;
+    --good: #2C7A3E; --good-soft: #E1F1E4; --warn: #9C5E06; --warn-soft: #FBEEDB;
+    --bad: #B0332B; --bad-soft: #F8E2E0; --row-hover: #F6F8FA; --sel-bg: #EEF6F8;
+    --shadow: 0 1px 2px rgba(23,34,44,.06), 0 10px 30px rgba(23,34,44,.08);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0F1518; --surface: #171F25; --ink: #E7ECF0; --ink-2: #B3BEC7; --ink-3: #7F8C96;
+      --line: #28333B; --accent: #5FC3D8; --accent-soft: #123039; --accent-ink: #8AD6E6;
+      --good: #7BD290; --good-soft: #16301D; --warn: #E8AC4F; --warn-soft: #3A2A0F;
+      --bad: #F29087; --bad-soft: #3C1916; --row-hover: #1C252C; --sel-bg: #152A31;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.4);
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    padding-bottom: 96px;
+  }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* header */
+  header { border-bottom: 1px solid var(--line); background: var(--surface); }
+  header .wrap { display: flex; align-items: center; gap: 18px; height: 56px; }
+  header h1 { font-size: 17px; font-weight: 650; margin: 0; letter-spacing: -0.01em; }
+  header .conn { margin-left: auto; color: var(--ink-3); font-size: 13px; display: flex; gap: 10px; align-items: center; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); display: inline-block; }
+  .dot.off { background: var(--bad); }
+
+  /* tabs */
+  .tabs { display: flex; gap: 6px; padding: 16px 0 0; flex-wrap: wrap; }
+  .tab {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px;
+    text-align: left; min-width: 180px; display: grid; gap: 4px;
+  }
+  .tab.active { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .tab .name { font-weight: 600; }
+  .tab .sub { color: var(--ink-3); font-size: 12px; }
+
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600;
+    letter-spacing: .05em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px;
+    background: var(--accent-soft); color: var(--accent-ink); white-space: nowrap;
+  }
+  .chip.good { background: var(--good-soft); color: var(--good); }
+  .chip.warn { background: var(--warn-soft); color: var(--warn); }
+  .chip.bad { background: var(--bad-soft); color: var(--bad); }
+  .chip.muted { background: var(--bg); color: var(--ink-3); border: 1px solid var(--line); }
+
+  /* panel */
+  .panel { margin-top: 18px; }
+  .banner { border-left: 3px solid var(--warn); background: var(--warn-soft); padding: 10px 14px; border-radius: 0 6px 6px 0; margin: 12px 0; }
+  .banner.bad { border-left-color: var(--bad); background: var(--bad-soft); }
+  .banner.info { border-left-color: var(--accent); background: var(--accent-soft); }
+  .banner p { margin: 4px 0; }
+
+  .stats { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 14px; margin: 14px 0; }
+  .stat { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+  .stat .label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); font-weight: 600; }
+  .stat .big { font-size: 20px; font-weight: 650; margin-top: 2px; }
+  .stat .sub { color: var(--ink-2); font-size: 13px; }
+  .bar { position: relative; height: 10px; border-radius: 5px; background: var(--line); margin: 8px 0 6px; overflow: hidden; }
+  .bar .used { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); }
+  .bar .delta { position: absolute; top: 0; bottom: 0; background: var(--good); opacity: .7; }
+  .bar .delta.grow { background: var(--warn); }
+  .bar.over .used { background: var(--bad); }
+
+  .toolbar { display: flex; gap: 10px; align-items: center; margin: 10px 0; flex-wrap: wrap; }
+  .toolbar input[type=search], .toolbar select {
+    font: inherit; padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink);
+  }
+  .toolbar input[type=search] { flex: 1; min-width: 200px; }
+  .btn { border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: 7px 12px; }
+  .btn:hover { background: var(--row-hover); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .btn.danger { background: var(--bad); border-color: var(--bad); color: #fff; font-weight: 600; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .count { color: var(--ink-3); font-size: 13px; margin-left: auto; }
+
+  /* list */
+  .list { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .row { display: grid; grid-template-columns: 28px 22px 1fr auto auto; align-items: center; gap: 10px; padding: 8px 12px; border-top: 1px solid var(--line); }
+  .row:first-child { border-top: 0; }
+  .row:hover { background: var(--row-hover); }
+  .row.sel { background: var(--sel-bg); }
+  .row.child { padding-left: 44px; background: transparent; }
+  .row.child.sel { background: var(--sel-bg); }
+  .row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .name.dim { color: var(--ink-3); }
+  .row .size { color: var(--ink-2); min-width: 80px; text-align: right; }
+  .row input[type=checkbox] { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
+  .caret { border: 0; background: none; padding: 0; width: 22px; height: 22px; color: var(--ink-3); border-radius: 4px; }
+  .caret:hover { background: var(--line); }
+  .caret.open svg { transform: rotate(90deg); }
+  .caret svg { transition: transform .12s; }
+  .empty { padding: 40px; text-align: center; color: var(--ink-3); }
+  .changed { box-shadow: inset 3px 0 0 var(--warn); }
+
+  /* bottom bar */
+  .dock {
+    position: fixed; left: 0; right: 0; bottom: 0; background: var(--surface); border-top: 1px solid var(--line);
+    box-shadow: 0 -8px 30px rgba(0,0,0,.08); transform: translateY(110%); transition: transform .18s;
+  }
+  .dock.show { transform: none; }
+  .dock .wrap { display: flex; align-items: center; gap: 16px; height: 64px; }
+  .dock .summary { display: flex; gap: 18px; flex-wrap: wrap; }
+  .dock .summary b { font-weight: 650; }
+  .dock .actions { margin-left: auto; display: flex; gap: 8px; }
+
+  /* modal */
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 10; }
+  .modal-bg.show { display: flex; }
+  .modal { background: var(--surface); border-radius: 10px; width: min(720px, 100%); max-height: 90vh; overflow: auto; box-shadow: var(--shadow); }
+  .modal header { border-bottom: 1px solid var(--line); background: none; }
+  .modal header .wrap { height: auto; padding: 16px 20px; }
+  .modal h2 { font-size: 17px; margin: 0; }
+  .modal section { padding: 14px 20px; border-bottom: 1px solid var(--line); }
+  .modal section:last-of-type { border-bottom: 0; }
+  .modal h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); margin: 0 0 8px; }
+  .modal ul { margin: 0; padding: 0; list-style: none; }
+  .modal li { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; }
+  .modal li span:last-child { color: var(--ink-2); white-space: nowrap; }
+  .modal footer { display: flex; gap: 8px; justify-content: flex-end; padding: 14px 20px; }
+  details summary { cursor: pointer; color: var(--ink-2); }
+  pre { background: var(--bg); padding: 10px 12px; border-radius: 6px; overflow-x: auto; font-size: 12px; margin: 8px 0 0; }
+  .toast { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 8px; box-shadow: var(--shadow); z-index: 20; max-width: 90vw; }
+  .toast.bad { background: var(--bad); color: #fff; }
+  @media (max-width: 720px) {
+    .stats { grid-template-columns: 1fr; }
+    .row { grid-template-columns: 28px 22px 1fr auto; }
+    .row .size { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { .dock, .caret svg { transition: none; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>Syncpick</h1>
+    <span id="dry" class="chip warn" hidden>Dry run</span>
+    <div class="conn"><span id="conn-dot" class="dot off"></span><span id="conn-text">Connecting…</span></div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="tabs" id="tabs"></div>
+  <div class="panel" id="panel"><div class="empty">Loading…</div></div>
+</main>
+
+<div class="dock" id="dock">
+  <div class="wrap">
+    <div class="summary" id="dock-summary"></div>
+    <div class="actions">
+      <button class="btn" id="discard">Discard</button>
+      <button class="btn primary" id="review">Review changes</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal-bg">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <header><div class="wrap"><h2 id="modal-title">Review changes</h2></div></header>
+    <div id="modal-body"></div>
+    <footer>
+      <button class="btn" id="modal-cancel">Cancel</button>
+      <button class="btn primary" id="modal-confirm">Apply</button>
+    </footer>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = (s, el = document) => el.querySelector(s);
+  const state = {
+    overview: null, folderId: null, tree: null,
+    original: new Set(), sel: new Set(), open: new Set(),
+    query: '', filter: 'all', sort: 'name', plan: null, busy: false,
+  };
+
+  // ---- helpers -----------------------------------------------------------
+  const fmt = (b) => {
+    if (b == null) return '–';
+    const u = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let i = 0, n = Math.abs(b);
+    while (n >= 1000 && i < u.length - 1) { n /= 1000; i++; }
+    return (b < 0 ? '−' : '') + (i >= 3 ? n.toFixed(n < 10 ? 2 : 1) : n.toFixed(i >= 2 ? 1 : 0)) + ' ' + u[i];
+  };
+  const esc = (s) => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const api = async (path, opts) => {
+    const r = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...opts });
+    const data = await r.json().catch(() => ({ error: 'bad response' }));
+    if (!r.ok) throw new Error(data.error || r.statusText);
+    return data;
+  };
+  let toastTimer;
+  const toast = (msg, bad) => {
+    let t = $('#toast');
+    if (!t) { t = document.createElement('div'); t.id = 'toast'; document.body.appendChild(t); }
+    t.className = 'toast' + (bad ? ' bad' : ''); t.textContent = msg;
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.remove(), bad ? 9000 : 4000);
+  };
+  const covered = (path, set) => { const p = path.split('/'); for (let i = 1; i <= p.length; i++) if (set.has(p.slice(0, i).join('/'))) return true; return false; };
+  const hasDesc = (path, set) => { const pre = path + '/'; for (const s of set) if (s.startsWith(pre)) return true; return false; };
+  const dirty = () => state.sel.size !== state.original.size || [...state.sel].some(p => !state.original.has(p));
+
+  // ---- overview / tabs -----------------------------------------------------
+  async function loadOverview() {
+    try {
+      state.overview = await api('/api/overview');
+    } catch (e) {
+      $('#conn-dot').className = 'dot off'; $('#conn-text').textContent = e.message; return;
+    }
+    const st = state.overview.syncthing;
+    $('#conn-dot').className = 'dot' + (st.ok ? '' : ' off');
+    $('#conn-text').textContent = st.ok ? `Syncthing ${st.version || ''} · ${state.overview.config.syncthing_url}` : st.error;
+    $('#dry').hidden = !state.overview.config.dry_run;
+    renderTabs();
+    if (!state.folderId && state.overview.folders.length) selectFolder(state.overview.folders[0].id);
+    else if (state.folderId) renderStats();
+  }
+
+  function renderTabs() {
+    const tabs = $('#tabs'); tabs.innerHTML = '';
+    for (const f of state.overview.folders) {
+      const b = document.createElement('button');
+      b.className = 'tab' + (f.id === state.folderId ? ' active' : '');
+      const type = f.type === 'receiveonly' ? 'Receive only' : f.type === 'sendonly' ? 'Send only' : 'Send & receive';
+      const comp = f.status.completion != null ? `${Math.round(f.status.completion)}% synced` : '';
+      b.innerHTML = `<span class="name">${esc(f.label)}</span>
+        <span class="sub">${f.managed ? `${f.selected_count} selected` : 'not managed'} · ${type}${comp ? ' · ' + comp : ''}</span>`;
+      b.onclick = () => selectFolder(f.id);
+      tabs.appendChild(b);
+    }
+    if (!state.overview.folders.length) tabs.innerHTML = '<div class="empty">Syncthing reports no folders (or FOLDERS filters them all out).</div>';
+  }
+
+  async function selectFolder(id) {
+    if (dirty() && !confirm('Discard unsaved changes?')) return;
+    state.folderId = id; state.tree = null; state.sel = new Set(); state.original = new Set(); state.open = new Set();
+    renderTabs(); $('#panel').innerHTML = '<div class="empty">Loading catalogue…</div>'; updateDock();
+    await loadTree(false);
+  }
+
+  async function loadTree(refresh) {
+    try {
+      state.tree = await api(`/api/tree?folder=${encodeURIComponent(state.folderId)}${refresh ? '&refresh=1' : ''}`);
+    } catch (e) {
+      $('#panel').innerHTML = `<div class="banner bad"><p><b>Could not load this folder.</b> ${esc(e.message)}</p></div>`; return;
+    }
+    state.original = new Set(state.tree.selected); state.sel = new Set(state.tree.selected);
+    renderPanel(); updateDock();
+  }
+
+  // ---- panel ---------------------------------------------------------------
+  function folderInfo() { return state.overview.folders.find(f => f.id === state.folderId); }
+
+  function renderPanel() {
+    const t = state.tree, f = folderInfo();
+    const panel = $('#panel'); panel.innerHTML = '';
+    if (!t.managed) {
+      panel.innerHTML = `
+        <div class="banner info">
+          <p><b>${esc(f.label)} is not managed yet.</b></p>
+          <p>Enabling selective sync writes a whitelist to this folder's ignore patterns. It starts with everything currently on disk
+          (${fmt(t.local_size)} across ${t.items.filter(i => i.state !== 'absent').length} entries) so nothing changes until you deselect something.
+          ${t.user_patterns.length ? 'Your existing patterns are kept above the managed block.' : ''}</p>
+          <p><button class="btn primary" id="enable">Enable selective sync</button></p>
+        </div>`;
+      $('#enable').onclick = async () => {
+        $('#enable').disabled = true;
+        try { const r = await api(`/api/enable?folder=${encodeURIComponent(state.folderId)}`, { method: 'POST' });
+          toast(`Enabled. ${r.selected.length} entries whitelisted.`); await loadOverview(); await loadTree(false);
+        } catch (e) { toast(e.message, true); $('#enable').disabled = false; }
+      };
+      return;
+    }
+    if (!t.mount.ok) {
+      panel.insertAdjacentHTML('beforeend', `<div class="banner bad"><p><b>Deletions are disabled.</b> ${esc(t.mount.reason || '')}</p>
+        <p>This container must mount the same directory Syncthing uses, at the same path or one mapped with <code>PATH_MAP</code>.</p></div>`);
+    }
+    if (f.type !== 'receiveonly') {
+      panel.insertAdjacentHTML('beforeend', `<div class="banner"><p><b>This folder is “${f.type === 'sendonly' ? 'Send only' : 'Send & receive'}” on this device.</b>
+        Set it to <b>Receive only</b> in Syncthing so nothing deleted here can ever propagate back to the source library.</p></div>`);
+    }
+    panel.insertAdjacentHTML('beforeend', `
+      <div class="stats" id="stats"></div>
+      <div class="toolbar">
+        <input type="search" id="q" placeholder="Search…" value="${esc(state.query)}">
+        <select id="filter">
+          <option value="all">All</option><option value="selected">Selected</option><option value="unselected">Not selected</option>
+          <option value="ondisk">On disk</option><option value="absent">Not on disk</option><option value="changed">Changed</option>
+        </select>
+        <select id="sort"><option value="name">Name</option><option value="size">Size</option></select>
+        <button class="btn" id="refresh" title="Re-read the catalogue from Syncthing and rescan the disk">Refresh</button>
+        <span class="count" id="count"></span>
+      </div>
+      <div class="list" id="list"></div>`);
+    $('#filter').value = state.filter; $('#sort').value = state.sort;
+    $('#q').oninput = (e) => { state.query = e.target.value; renderList(); };
+    $('#filter').onchange = (e) => { state.filter = e.target.value; renderList(); };
+    $('#sort').onchange = (e) => { state.sort = e.target.value; renderList(); };
+    $('#refresh').onclick = async () => { if (dirty() && !confirm('Discard unsaved changes and refresh?')) return; $('#refresh').disabled = true; await loadOverview(); await loadTree(true); };
+    renderStats(); renderList();
+  }
+
+  function selectedBytes(items, set) {
+    let bytes = 0, count = 0;
+    for (const it of items) {
+      if (covered(it.path, set)) { bytes += it.size; count++; }
+      else if (it.children && hasDesc(it.path, set)) { count++; for (const c of it.children) if (covered(c.path, set)) bytes += c.size; }
+    }
+    return { bytes, count };
+  }
+  function pendingBytes() {
+    // Rough client-side estimate; the server's plan is authoritative.
+    let dl = 0, del = 0, adds = 0, rems = 0;
+    const walk = (items) => {
+      for (const it of items) {
+        const now = covered(it.path, state.sel), was = covered(it.path, state.original);
+        const partialNow = !now && it.children && hasDesc(it.path, state.sel);
+        const partialWas = !was && it.children && hasDesc(it.path, state.original);
+        if (now && !was) { dl += Math.max(0, it.size - it.local_size); adds++; if (partialWas) { /* children already counted */ } }
+        else if (!now && was) { if (partialNow) { walk(it.children); } else { del += it.local_size; rems++; } }
+        else if (!now && !was && it.children && (partialNow || partialWas)) walk(it.children);
+      }
+    };
+    walk(state.tree.items);
+    return { dl, del, adds, rems };
+  }
+
+  function renderStats() {
+    const t = state.tree, f = folderInfo(); if (!t || !t.managed || !$('#stats')) return;
+    const disk = f.disk, sel = selectedBytes(t.items, state.sel), p = pendingBytes();
+    const projectedFree = disk ? disk.free + p.del - p.dl : null;
+    const over = projectedFree != null && projectedFree < 0;
+    const usedPct = disk ? (disk.used / disk.total) * 100 : 0;
+    const deltaPct = disk ? ((p.dl - p.del) / disk.total) * 100 : 0;
+    const s = f.status;
+    $('#stats').innerHTML = `
+      <div class="stat">
+        <div class="label">Disk at ${esc(f.local_path)}</div>
+        <div class="big num">${disk ? fmt(disk.free) : '–'} free <span class="sub">of ${disk ? fmt(disk.total) : '–'}</span></div>
+        <div class="bar${over ? ' over' : ''}">
+          <div class="used" style="width:${usedPct.toFixed(2)}%"></div>
+          ${deltaPct > 0 ? `<div class="delta grow" style="left:${usedPct.toFixed(2)}%;width:${Math.min(deltaPct, 100 - usedPct).toFixed(2)}%"></div>` :
+            deltaPct < 0 ? `<div class="delta" style="left:${(usedPct + deltaPct).toFixed(2)}%;width:${(-deltaPct).toFixed(2)}%"></div>` : ''}
+        </div>
+        <div class="sub num">${dirty() ? `After apply: ≈ ${fmt(projectedFree)} free${over ? ' — over budget' : ''}` : `${fmt(disk ? disk.used : null)} used`}</div>
+      </div>
+      <div class="stat">
+        <div class="label">Selected</div>
+        <div class="big num">${sel.count} <span class="sub">of ${t.items.length}</span></div>
+        <div class="sub num">${fmt(sel.bytes)} of ${fmt(t.global_size)} in the catalogue</div>
+      </div>
+      <div class="stat">
+        <div class="label">Sync status</div>
+        <div class="big num">${s.completion != null ? Math.round(s.completion) + '%' : '–'} <span class="sub">${esc(s.state || '')}</span></div>
+        <div class="sub num">${s.need_bytes ? `${fmt(s.need_bytes)} still to download` : 'Up to date'}${s.errors ? ` · ${s.errors} errors` : ''}</div>
+      </div>`;
+  }
+
+  const stateChip = (it) => {
+    if (it.state === 'complete') return '<span class="chip good">On disk</span>';
+    if (it.state === 'partial') { const pct = it.size ? Math.round(100 * it.local_size / it.size) : 0; return `<span class="chip warn">${pct}% on disk</span>`; }
+    if (it.state === 'local-only') return '<span class="chip bad" title="Exists here but not on any other device">Local only</span>';
+    return '<span class="chip muted">Not on disk</span>';
+  };
+
+  function visible(it) {
+    const q = state.query.trim().toLowerCase();
+    if (q && !it.name.toLowerCase().includes(q) && !(it.children || []).some(c => c.name.toLowerCase().includes(q))) return false;
+    const now = covered(it.path, state.sel) || (it.children && hasDesc(it.path, state.sel));
+    const was = covered(it.path, state.original) || (it.children && hasDesc(it.path, state.original));
+    switch (state.filter) {
+      case 'selected': return now;
+      case 'unselected': return !now;
+      case 'ondisk': return it.state !== 'absent';
+      case 'absent': return it.state === 'absent';
+      case 'changed': return now !== was || (it.children || []).some(c => covered(c.path, state.sel) !== covered(c.path, state.original));
+      default: return true;
+    }
+  }
+
+  function renderList() {
+    const t = state.tree, list = $('#list'); if (!list) return;
+    let items = t.items.filter(visible);
+    if (state.sort === 'size') items = [...items].sort((a, b) => b.size - a.size);
+    $('#count').textContent = `${items.length} of ${t.items.length} entries`;
+    if (!items.length) { list.innerHTML = '<div class="empty">Nothing matches.</div>'; return; }
+    const frag = document.createDocumentFragment();
+    for (const it of items) {
+      frag.appendChild(rowFor(it, false));
+      if (it.children && state.open.has(it.path)) for (const c of it.children) frag.appendChild(rowFor(c, true));
+    }
+    list.replaceChildren(frag);
+  }
+
+  function rowFor(it, isChild) {
+    const full = covered(it.path, state.sel);
+    const partial = !full && it.children && hasDesc(it.path, state.sel);
+    const changed = full !== covered(it.path, state.original) || (partial !== (!covered(it.path, state.original) && it.children && hasDesc(it.path, state.original)));
+    const row = document.createElement('div');
+    row.className = 'row' + (isChild ? ' child' : '') + (full || partial ? ' sel' : '') + (changed ? ' changed' : '');
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = full; cb.indeterminate = !!partial;
+    cb.setAttribute('aria-label', `Sync ${it.name}`);
+    cb.onchange = () => toggle(it, isChild);
+    row.appendChild(cb);
+    const caret = document.createElement('button'); caret.className = 'caret' + (state.open.has(it.path) ? ' open' : '');
+    if (it.children && it.children.length) {
+      caret.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12"><path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>';
+      caret.title = 'Show contents';
+      caret.onclick = () => { state.open.has(it.path) ? state.open.delete(it.path) : state.open.add(it.path); renderList(); };
+    } else caret.disabled = true;
+    row.appendChild(caret);
+    const name = document.createElement('div'); name.className = 'name' + (!it.in_global ? ' dim' : ''); name.textContent = it.name; name.title = it.path;
+    row.appendChild(name);
+    const chip = document.createElement('div'); chip.innerHTML = stateChip(it); row.appendChild(chip);
+    const size = document.createElement('div'); size.className = 'size num'; size.textContent = fmt(it.size || it.local_size); row.appendChild(size);
+    return row;
+  }
+
+  function toggle(it, isChild) {
+    const sel = state.sel;
+    if (!isChild) {
+      if (covered(it.path, sel)) { sel.delete(it.path); }
+      else { sel.add(it.path); for (const s of [...sel]) if (s.startsWith(it.path + '/')) sel.delete(s); }
+    } else {
+      const parent = it.path.split('/').slice(0, -1).join('/');
+      const parentItem = state.tree.items.find(i => i.path === parent);
+      if (sel.has(parent)) {
+        sel.delete(parent);
+        for (const c of parentItem.children) if (c.path !== it.path) sel.add(c.path);
+      } else if (sel.has(it.path)) sel.delete(it.path);
+      else sel.add(it.path);
+    }
+    renderStats(); renderList(); updateDock();
+  }
+
+  // ---- dock / plan / apply ------------------------------------------------
+  function updateDock() {
+    const d = dirty(); $('#dock').classList.toggle('show', d);
+    if (!d) return;
+    const p = pendingBytes();
+    $('#dock-summary').innerHTML = `
+      ${p.adds ? `<span><b>+${p.adds}</b> to sync · ${fmt(p.dl)} to download</span>` : ''}
+      ${p.rems ? `<span><b>−${p.rems}</b> to remove · ${fmt(p.del)} to delete</span>` : ''}
+      ${!p.adds && !p.rems ? '<span>Selection changed</span>' : ''}`;
+  }
+  $('#discard').onclick = () => { state.sel = new Set(state.original); renderStats(); renderList(); updateDock(); };
+  $('#review').onclick = async () => {
+    $('#review').disabled = true;
+    try {
+      state.plan = await api(`/api/plan?folder=${encodeURIComponent(state.folderId)}`, { method: 'POST', body: JSON.stringify({ selected: [...state.sel] }) });
+      showPlan();
+    } catch (e) { toast(e.message, true); }
+    $('#review').disabled = false;
+  };
+
+  function showPlan() {
+    const p = state.plan, body = $('#modal-body');
+    const over = p.projected_free != null && p.projected_free < 0;
+    const blocked = p.deletions.length && !p.mount.ok;
+    body.innerHTML = `
+      ${blocked ? `<section><div class="banner bad"><p><b>Cannot apply.</b> ${esc(p.mount.reason || '')}</p></div></section>` : ''}
+      ${over ? `<section><div class="banner bad"><p><b>Over budget.</b> This selection needs ${fmt(-p.projected_free)} more than the disk has.</p></div></section>` : ''}
+      ${p.dry_run ? `<section><div class="banner"><p>DRY_RUN is on: the server will report what it would do and change nothing.</p></div></section>` : ''}
+      <section>
+        <h3>Will be synced (${p.additions.length}) · ${fmt(p.download_bytes)} to download</h3>
+        ${p.additions.length ? `<ul>${p.additions.map(a => `<li><span>${esc(a.path)}</span><span class="num">${fmt(a.size)}</span></li>`).join('')}</ul>` : '<div class="sub">Nothing new.</div>'}
+      </section>
+      <section>
+        <h3>Will be deleted from this disk (${p.deletions.length}) · ${fmt(p.delete_bytes)} freed</h3>
+        ${p.deletions.length ? `<ul>${p.deletions.map(d => `<li><span>${esc(d.path)}</span><span class="num">${fmt(d.size)}</span></li>`).join('')}</ul>` : '<div class="sub">Nothing to delete.</div>'}
+      </section>
+      <section>
+        <div class="sub num">Free space after apply: ≈ ${fmt(p.projected_free)}</div>
+        <details><summary>Ignore patterns that will be written (${p.patterns.length} lines)</summary><pre>${esc(p.patterns.join('\n'))}</pre></details>
+      </section>`;
+    $('#modal-confirm').disabled = !!blocked; $('#modal-confirm').className = 'btn ' + (p.deletions.length ? 'danger' : 'primary');
+    $('#modal-confirm').textContent = p.deletions.length ? `Apply and delete ${p.deletions.length} item${p.deletions.length > 1 ? 's' : ''}` : 'Apply';
+    $('#modal-bg').classList.add('show');
+  }
+  $('#modal-cancel').onclick = () => $('#modal-bg').classList.remove('show');
+  $('#modal-bg').addEventListener('click', (e) => { if (e.target === e.currentTarget) $('#modal-bg').classList.remove('show'); });
+  $('#modal-confirm').onclick = async () => {
+    const btn = $('#modal-confirm'); btn.disabled = true; btn.textContent = 'Applying…';
+    try {
+      const r = await api(`/api/apply?folder=${encodeURIComponent(state.folderId)}`, { method: 'POST', body: JSON.stringify({ selected: state.plan.selected }) });
+      $('#modal-bg').classList.remove('show');
+      const bits = [];
+      if (r.wrote_patterns) bits.push('patterns written');
+      if (r.deleted.length) bits.push(`${r.deleted.length} deleted (${fmt(r.freed_bytes)})`);
+      if (r.skipped.length) bits.push(`${r.skipped.length} skipped`);
+      if (r.dry_run) bits.push('dry run, nothing changed');
+      toast('Applied: ' + (bits.join(', ') || 'no changes') + (r.warnings.length ? '. ' + r.warnings.join(' ') : ''), r.skipped.length > 0);
+      await loadOverview(); await loadTree(false);
+    } catch (e) { toast(e.message, true); btn.disabled = false; btn.textContent = 'Apply'; }
+  };
+
+  window.addEventListener('beforeunload', (e) => { if (dirty()) { e.preventDefault(); e.returnValue = ''; } });
+  loadOverview();
+  setInterval(() => { if (!dirty() && !$('#modal-bg').classList.contains('show')) loadOverview(); }, 30000);
+})();
+</script>
+</body>
+</html>

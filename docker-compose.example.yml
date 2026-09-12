@@ -1,0 +1,31 @@
+# Add this service to the compose file that runs your Syncthing container.
+# Adjust the two volume mounts to match it: the data mount must land at the
+# same path Syncthing uses, and the config mount is only there for the API key.
+services:
+  syncpick:
+    image: syncpick:latest        # or: build: ./syncpick
+    container_name: syncpick
+    environment:
+      PUID: 1000                  # same user as your Syncthing container
+      PGID: 1000
+      TZ: Etc/UTC
+      SYNCTHING_URL: http://syncthing:8384
+      # The API key is read from the mounted config.xml. To set it explicitly instead:
+      # SYNCTHING_API_KEY: xxxxxxxx
+      # Only manage these Syncthing folder IDs (default: all folders):
+      # FOLDERS: folder-a,folder-b
+      # If the data is mounted at a different path here than in Syncthing:
+      # PATH_MAP: /data:/mnt/data
+      # Try it without touching anything first:
+      # DRY_RUN: "true"
+      # If you front containers with nginx-proxy or similar:
+      # VIRTUAL_HOST: syncpick.example.lan
+      # VIRTUAL_PORT: 8080
+    volumes:
+      - ./syncthing/config:/syncthing-config:ro   # Syncthing's config dir, for the API key
+      - /path/to/data:/data                        # same mount, same path, as the syncthing service
+    ports:
+      - 8080:8080
+    depends_on:
+      - syncthing
+    restart: unless-stopped
